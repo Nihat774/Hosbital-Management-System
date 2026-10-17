@@ -1,0 +1,22 @@
+
+# Visual Studio
+.vs/
+**/.vs/
+
+# .NET build files
+**/bin/
+**/obj/
+
+# Next.js
+**/node_modules/
+**/.next/
+**/out/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE files
+*.user
+*.suo
