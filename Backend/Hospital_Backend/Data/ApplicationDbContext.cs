@@ -14,5 +14,14 @@ public class ApplicationDbContext:DbContext
     public DbSet<Staff> Staff { get; set; }
     public DbSet<Manager> Managers { get; set; }
     public DbSet<Appointment> Appointments { get; set; }
+    public DbSet<UserAccount> UserAccounts { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<UserAccount>()
+            .HasIndex(user => user.Email)
+            .IsUnique();
+    }
 
     }
