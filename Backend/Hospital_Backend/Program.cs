@@ -1,4 +1,7 @@
 
+using Hospital_Backend.Data;
+using Microsoft.EntityFrameworkCore;
+
 namespace Hospital_Backend
 {
     public class Program
@@ -12,6 +15,7 @@ namespace Hospital_Backend
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
+            builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
             var app = builder.Build();
 
             if (app.Environment.IsDevelopment())
