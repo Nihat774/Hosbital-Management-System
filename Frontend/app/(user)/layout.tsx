@@ -1,4 +1,6 @@
+
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "../globals.css";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -15,8 +17,12 @@ export default function RootLayout({
 }>) {
   return (
     <div>
-      <Header />
-      <div className="flex flex-col ">{children}</div>
+      <Suspense fallback={<div className="h-20" />}>
+        <Header />
+      </Suspense>
+
+      <div className="flex flex-col">{children}</div>
+
       <Footer />
     </div>
   );

@@ -13,7 +13,16 @@ namespace Hospital_Backend
         public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
-
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("Frontend", policy =>
+                {
+                    policy
+                        .WithOrigins("http://localhost:3000")
+                        .AllowAnyHeader()
+                        .AllowAnyMethod();
+                });
+            });
             // Controller ve Swagger
             builder.Services.AddControllers();
             builder.Services.AddEndpointsApiExplorer();
@@ -84,6 +93,8 @@ namespace Hospital_Backend
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
+
+            app.UseCors("Frontend");
 
             app.UseHttpsRedirection();
 
