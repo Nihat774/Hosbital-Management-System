@@ -98,7 +98,14 @@ namespace Hospital_Backend.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("UserAccountId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UserAccountId")
+                        .IsUnique()
+                        .HasFilter("[UserAccountId] IS NOT NULL");
 
                     b.ToTable("Doctors");
                 });
@@ -163,7 +170,14 @@ namespace Hospital_Backend.Migrations
                     b.Property<string>("PhotoUrl")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("UserAccountId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UserAccountId")
+                        .IsUnique()
+                        .HasFilter("[UserAccountId] IS NOT NULL");
 
                     b.ToTable("Patient");
                 });
@@ -201,7 +215,14 @@ namespace Hospital_Backend.Migrations
                     b.Property<string>("PhotoUrl")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("UserAccountId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UserAccountId")
+                        .IsUnique()
+                        .HasFilter("[UserAccountId] IS NOT NULL");
 
                     b.ToTable("Staff");
                 });
@@ -255,6 +276,45 @@ namespace Hospital_Backend.Migrations
                     b.Navigation("Doctor");
 
                     b.Navigation("Patient");
+                });
+
+            modelBuilder.Entity("Hospital_Backend.Models.Doctor", b =>
+                {
+                    b.HasOne("Hospital_Backend.Models.UserAccount", "UserAccount")
+                        .WithOne("Doctor")
+                        .HasForeignKey("Hospital_Backend.Models.Doctor", "UserAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("UserAccount");
+                });
+
+            modelBuilder.Entity("Hospital_Backend.Models.Patient", b =>
+                {
+                    b.HasOne("Hospital_Backend.Models.UserAccount", "UserAccount")
+                        .WithOne("Patient")
+                        .HasForeignKey("Hospital_Backend.Models.Patient", "UserAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("UserAccount");
+                });
+
+            modelBuilder.Entity("Hospital_Backend.Models.Staff", b =>
+                {
+                    b.HasOne("Hospital_Backend.Models.UserAccount", "UserAccount")
+                        .WithOne("Staff")
+                        .HasForeignKey("Hospital_Backend.Models.Staff", "UserAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("UserAccount");
+                });
+
+            modelBuilder.Entity("Hospital_Backend.Models.UserAccount", b =>
+                {
+                    b.Navigation("Doctor");
+
+                    b.Navigation("Patient");
+
+                    b.Navigation("Staff");
                 });
 #pragma warning restore 612, 618
         }

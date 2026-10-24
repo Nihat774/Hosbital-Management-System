@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -13,6 +14,8 @@ export default function RegisterPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [age, setAge] = useState("");
+  const [gender, setGender] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -37,6 +40,18 @@ export default function RegisterPage() {
       return;
     }
 
+    const parsedAge = Number(age);
+
+    if (!Number.isInteger(parsedAge) || parsedAge < 1 || parsedAge > 120) {
+      setError("Yaş 1 ile 120 arasında olmalıdır.");
+      return;
+    }
+
+    if (!gender) {
+      setError("Lütfen cinsiyet seçiniz.");
+      return;
+    }
+
     if (!termsAccepted) {
       setError("Devam etmek için kullanım koşullarını kabul etmelisiniz.");
       return;
@@ -57,6 +72,8 @@ export default function RegisterPage() {
             email,
             password,
             phone,
+            age: parsedAge,
+            gender,
           }),
         }
       );
@@ -74,7 +91,9 @@ export default function RegisterPage() {
         throw new Error(message);
       }
 
-      setSuccess("Hesabınız başarıyla oluşturuldu. Giriş sayfasına yönlendiriliyorsunuz.");
+      setSuccess(
+        "Hesabınız başarıyla oluşturuldu. Giriş sayfasına yönlendiriliyorsunuz."
+      );
 
       setTimeout(() => {
         router.push("/login");
@@ -180,6 +199,51 @@ export default function RegisterPage() {
 
             <div>
               <label
+                htmlFor="age"
+                className="mb-2 block text-sm font-semibold text-gray-700"
+              >
+                Yaş
+              </label>
+
+              <input
+                id="age"
+                name="age"
+                type="number"
+                placeholder="Yaşınızı girin"
+                min={1}
+                max={120}
+                step={1}
+                value={age}
+                onChange={(event) => setAge(event.target.value)}
+                required
+                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="gender"
+                className="mb-2 block text-sm font-semibold text-gray-700"
+              >
+                Cinsiyet
+              </label>
+
+              <select
+                id="gender"
+                name="gender"
+                value={gender}
+                onChange={(event) => setGender(event.target.value)}
+                required
+                className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+              >
+                <option value="">Cinsiyet seçiniz</option>
+                <option value="Erkek">Erkek</option>
+                <option value="Kadın">Kadın</option>
+              </select>
+            </div>
+
+            <div>
+              <label
                 htmlFor="password"
                 className="mb-2 block text-sm font-semibold text-gray-700"
               >
@@ -227,7 +291,9 @@ export default function RegisterPage() {
                   autoComplete="new-password"
                   minLength={8}
                   value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  onChange={(event) =>
+                    setConfirmPassword(event.target.value)
+                  }
                   required
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 pr-20 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
                 />

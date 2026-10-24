@@ -5,7 +5,7 @@ using Hospital_Backend.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-
+using Microsoft.AspNetCore.Identity;
 namespace Hospital_Backend.Controllers;
 
 [Route("api/[controller]")]
@@ -79,6 +79,7 @@ public class DoctorsController : ControllerBase
     }
 
     // Yalnızca müdür doktor ekleyebilir.
+
     [Authorize(Roles = "Manager")]
     [HttpPost]
     public async Task<IActionResult> CreateDoctor(
@@ -86,45 +87,89 @@ public class DoctorsController : ControllerBase
     {
         var email = request.Email.Trim().ToLowerInvariant();
 
-        var emailExists = await _context.Doctors
+        // E-posta hem doktor hem kullanıcı hesabı tablolarında kontrol edilir.
+        var doctorExists = await _context.Doctors
             .AnyAsync(d => d.Email == email);
 
-        if (emailExists)
+        var accountExists = await _context.UserAccounts
+            .AnyAsync(u => u.Email == email);
+
+        if (doctorExists || accountExists)
         {
             return Conflict(new
             {
-                message = "Bu e-posta adresiyle kayıtlı bir doktor var."
+                message = "Bu e-posta adresi zaten kayıtlı."
             });
         }
 
-        var doctor = new Doctor
+        await using var transaction =
+            await _context.Database.BeginTransactionAsync();
+
+        try
         {
-            FullName = request.FullName.Trim(),
-            Email = email,
-            Gender = request.Gender.Trim(),
-            Phone = request.Phone,
-            PhotoUrl = request.PhotoUrl,
-            Specialty = request.Specialty.Trim(),
-            ExperienceYears = request.ExperienceYears,
-            University = request.University.Trim(),
-            About = request.About,
-            Languages = request.Languages
-        };
-
-        _context.Doctors.Add(doctor);
-        await _context.SaveChangesAsync();
-
-        return CreatedAtAction(
-            nameof(GetDoctor),
-            new { id = doctor.Id },
-            new
+            // Önce giriş hesabını oluşturuyoruz.
+            var user = new UserAccount
             {
-                doctor.Id,
-                doctor.FullName,
-                doctor.Email,
-                doctor.Specialty
+                FullName = request.FullName.Trim(),
+                Email = email,
+                Role = "Doctor"
+            };
+
+            var passwordHasher = new PasswordHasher<UserAccount>();
+
+            user.PasswordHash = passwordHasher.HashPassword(
+                user,
+                request.Password
+            );
+
+            _context.UserAccounts.Add(user);
+            await _context.SaveChangesAsync();
+
+            // Ardından doktor profilini oluşturup hesapla ilişkilendiriyoruz.
+            var doctor = new Doctor
+            {
+                FullName = request.FullName.Trim(),
+                Email = email,
+                Gender = request.Gender.Trim(),
+                Phone = request.Phone?.Trim(),
+                PhotoUrl = request.PhotoUrl,
+                Specialty = request.Specialty.Trim(),
+                ExperienceYears = request.ExperienceYears,
+                University = request.University.Trim(),
+                About = request.About,
+                Languages = request.Languages,
+                UserAccountId = user.Id
+            };
+
+            _context.Doctors.Add(doctor);
+            await _context.SaveChangesAsync();
+
+            await transaction.CommitAsync();
+
+            return CreatedAtAction(
+                nameof(GetDoctor),
+                new { id = doctor.Id },
+                new
+                {
+                    message = "Doktor ve giriş hesabı başarıyla oluşturuldu.",
+                    doctor.Id,
+                    doctor.FullName,
+                    doctor.Email,
+                    doctor.Specialty,
+                    user.Role
+                });
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync();
+
+            return Conflict(new
+            {
+                message = "Kayıt oluşturulamadı. E-posta adresini kontrol edin."
             });
+        }
     }
+
 
     // Yalnızca müdür doktor bilgilerini güncelleyebilir.
     [Authorize(Roles = "Manager")]
