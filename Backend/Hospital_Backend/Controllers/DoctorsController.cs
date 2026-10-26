@@ -171,14 +171,16 @@ public class DoctorsController : ControllerBase
     }
 
 
-    // Yalnızca müdür doktor bilgilerini güncelleyebilir.
+    // Yalnızca Manager doktor bilgilerini güncelleyebilir.
     [Authorize(Roles = "Manager")]
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateDoctor(
         int id,
-        [FromBody] DoctorRequest request)
+        [FromBody] DoctorUpdateRequest request)
     {
-        var doctor = await _context.Doctors.FindAsync(id);
+        var doctor = await _context.Doctors
+            .Include(d => d.UserAccount)
+            .FirstOrDefaultAsync(d => d.Id == id);
 
         if (doctor == null)
         {
@@ -190,21 +192,26 @@ public class DoctorsController : ControllerBase
 
         var email = request.Email.Trim().ToLowerInvariant();
 
-        var emailExists = await _context.Doctors
+        var doctorEmailExists = await _context.Doctors
             .AnyAsync(d => d.Email == email && d.Id != id);
 
-        if (emailExists)
+        var accountEmailExists = await _context.UserAccounts
+            .AnyAsync(u =>
+                u.Email == email &&
+                u.Id != doctor.UserAccountId);
+
+        if (doctorEmailExists || accountEmailExists)
         {
             return Conflict(new
             {
-                message = "Bu e-posta adresi başka bir doktora ait."
+                message = "Bu e-posta adresi başka bir hesaba ait."
             });
         }
 
         doctor.FullName = request.FullName.Trim();
         doctor.Email = email;
         doctor.Gender = request.Gender.Trim();
-        doctor.Phone = request.Phone;
+        doctor.Phone = request.Phone?.Trim();
         doctor.PhotoUrl = request.PhotoUrl;
         doctor.Specialty = request.Specialty.Trim();
         doctor.ExperienceYears = request.ExperienceYears;
@@ -212,17 +219,29 @@ public class DoctorsController : ControllerBase
         doctor.About = request.About;
         doctor.Languages = request.Languages;
 
+        if (doctor.UserAccount != null)
+        {
+            doctor.UserAccount.FullName = doctor.FullName;
+            doctor.UserAccount.Email = email;
+        }
+
         await _context.SaveChangesAsync();
 
-        return NoContent();
+        return Ok(new
+        {
+            message = "Doktor bilgileri başarıyla güncellendi."
+        });
     }
 
-    // Yalnızca müdür doktor silebilir.
+
+    // Yalnızca Manager doktor silebilir.
     [Authorize(Roles = "Manager")]
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteDoctor(int id)
     {
-        var doctor = await _context.Doctors.FindAsync(id);
+        var doctor = await _context.Doctors
+            .Include(d => d.UserAccount)
+            .FirstOrDefaultAsync(d => d.Id == id);
 
         if (doctor == null)
         {
@@ -232,9 +251,51 @@ public class DoctorsController : ControllerBase
             });
         }
 
-        _context.Doctors.Remove(doctor);
-        await _context.SaveChangesAsync();
+        // Doktora bağlı randevular varsa silme işlemini engelle.
+        var hasAppointments = await _context.Appointments
+            .AnyAsync(a => a.DoctorId == id);
 
-        return NoContent();
+        if (hasAppointments)
+        {
+            return Conflict(new
+            {
+                message = "Bu doktora bağlı randevular var. Önce randevuları yönetin."
+            });
+        }
+
+        var userAccount = doctor.UserAccount;
+
+        await using var transaction =
+            await _context.Database.BeginTransactionAsync();
+
+        try
+        {
+            _context.Doctors.Remove(doctor);
+            await _context.SaveChangesAsync();
+
+            // İlişkili giriş hesabını da sil.
+            if (userAccount != null)
+            {
+                _context.UserAccounts.Remove(userAccount);
+                await _context.SaveChangesAsync();
+            }
+
+            await transaction.CommitAsync();
+
+            return Ok(new
+            {
+                message = "Doktor ve giriş hesabı başarıyla silindi."
+            });
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync();
+
+            return Conflict(new
+            {
+                message = "Doktor silinemedi. İlişkili kayıtları kontrol edin."
+            });
+        }
     }
+
 }

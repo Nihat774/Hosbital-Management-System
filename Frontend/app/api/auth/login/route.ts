@@ -1,3 +1,4 @@
+
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -58,8 +59,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Backend'den gelen kullanıcı bilgisini al.
+    const user = data?.user ?? data?.User;
+
+    if (!user || !(user.role ?? user.Role)) {
+      return NextResponse.json(
+        {
+          message:
+            "Giriş başarılı ancak kullanıcı rolü backend yanıtında bulunamadı.",
+        },
+        { status: 502 }
+      );
+    }
+
+    // JWT cookie olarak saklanır; token tarayıcı JavaScript'ine açılmaz.
     const result = NextResponse.json({
       message: "Giriş başarılı.",
+      user: {
+        fullName: user.fullName ?? user.FullName,
+        email: user.email ?? user.Email,
+        role: user.role ?? user.Role,
+      },
     });
 
     result.cookies.set("auth_token", token, {

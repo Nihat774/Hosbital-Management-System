@@ -113,6 +113,131 @@ public class StaffController : ControllerBase
             });
         }
     }
+
+    public class UpdateStaffRequest
+    {
+        [Required]
+        public string FullName { get; set; } = string.Empty;
+
+        [Required, EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        public string Gender { get; set; } = string.Empty;
+
+        public string? Phone { get; set; }
+
+        public string? Jobtitle { get; set; }
+    }
+
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdateStaff(
+        int id,
+        [FromBody] UpdateStaffRequest request)
+    {
+        var staff = await _context.Staff
+            .Include(s => s.UserAccount)
+            .SingleOrDefaultAsync(s => s.Id == id);
+
+        if (staff == null)
+        {
+            return NotFound(new { message = "Personel bulunamadı." });
+        }
+
+        var email = request.Email.Trim().ToLowerInvariant();
+
+        var emailExists = await _context.UserAccounts.AnyAsync(u =>
+            u.Email == email && u.Id != staff.UserAccountId);
+
+        if (emailExists)
+        {
+            return Conflict(new
+            {
+                message = "Bu e-posta adresi zaten kayıtlı."
+            });
+        }
+
+        staff.FullName = request.FullName.Trim();
+        staff.Email = email;
+        staff.Gender = request.Gender.Trim();
+        staff.Phone = request.Phone?.Trim();
+        staff.Jobtitle = request.Jobtitle?.Trim();
+
+        if (staff.UserAccount != null)
+        {
+            staff.UserAccount.FullName = staff.FullName;
+            staff.UserAccount.Email = email;
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Personel bilgileri güncellendi.",
+            staff.Id,
+            staff.FullName,
+            staff.Email,
+            staff.Gender,
+            staff.Phone,
+            staff.Jobtitle
+        });
+    }
+
+
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteStaff(int id)
+    {
+        var staff = await _context.Staff
+            .SingleOrDefaultAsync(s => s.Id == id);
+
+        if (staff == null)
+        {
+            return NotFound(new { message = "Personel bulunamadı." });
+        }
+
+        var userAccountId = staff.UserAccountId;
+
+        await using var transaction =
+            await _context.Database.BeginTransactionAsync();
+
+        try
+        {
+            _context.Staff.Remove(staff);
+            await _context.SaveChangesAsync();
+
+            if (userAccountId.HasValue)
+            {
+                var user = await _context.UserAccounts
+                    .SingleOrDefaultAsync(u => u.Id == userAccountId.Value);
+
+                if (user != null)
+                {
+                    _context.UserAccounts.Remove(user);
+                    await _context.SaveChangesAsync();
+                }
+            }
+
+            await transaction.CommitAsync();
+
+            return Ok(new
+            {
+                message = "Personel başarıyla silindi."
+            });
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync();
+
+            return Conflict(new
+            {
+                message = "Personel silinemedi. İlişkili kayıtları kontrol edin."
+            });
+        }
+    }
+
+
 }
 
 public class CreateStaffRequest

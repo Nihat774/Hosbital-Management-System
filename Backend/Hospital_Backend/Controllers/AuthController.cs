@@ -22,7 +22,6 @@ public class AuthController : ControllerBase
         _context = context;
         _passwordHasher = new PasswordHasher<UserAccount>();
     }
-    [HttpPost]
 
     [HttpPost]
     public async Task<IActionResult> Register(RegisterRequest request)

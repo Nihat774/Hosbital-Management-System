@@ -41,7 +41,29 @@ export default function LoginPage() {
       setEmail("");
       setPassword("");
       setError("");
-      router.push("/");
+      const role = data.user?.role ?? data.user?.Role;
+      switch (role) {
+        case "Manager":
+          router.push("/admin");
+          break;
+
+        case "Doctor":
+          router.push("/doctor");
+          break;
+
+        case "Staff":
+          router.push("/staff");
+          break;
+
+        case "Patient":
+          router.push("/patient");
+          break;
+
+        default:
+          setError("Kullanıcı rolü tanınamadı.");
+          return;
+      }
+
       router.refresh();
     } catch (err) {
       if (err instanceof TypeError) {
