@@ -359,4 +359,66 @@ public class AppointmentsController : ControllerBase
         });
     }
 
+    // Hasta: Bekleyen randevusunu iptal et
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "Patient")]
+    public async Task<IActionResult> CancelAppointment(int id)
+    {
+        var userIdValue = User.FindFirstValue(
+            ClaimTypes.NameIdentifier);
+
+        if (!int.TryParse(userIdValue, out var userId))
+        {
+            return Unauthorized(new
+            {
+                message = "Kullanıcı kimliği doğrulanamadı."
+            });
+        }
+
+        var patient = await _context.Patient
+            .SingleOrDefaultAsync(p => p.UserAccountId == userId);
+
+        if (patient == null)
+        {
+            return NotFound(new
+            {
+                message = "Hasta kaydı bulunamadı."
+            });
+        }
+
+        var appointment = await _context.Appointments
+            .SingleOrDefaultAsync(a => a.Id == id);
+
+        if (appointment == null)
+        {
+            return NotFound(new
+            {
+                message = "Randevu bulunamadı."
+            });
+        }
+
+        // Hasta yalnızca kendi randevusunu iptal edebilir.
+        if (appointment.PatientId != patient.Id)
+        {
+            return Forbid();
+        }
+
+        // Yalnızca doktorun henüz onaylamadığı randevular iptal edilebilir.
+        if (appointment.Status != AppointmentStatus.Pending)
+        {
+            return BadRequest(new
+            {
+                message = "Yalnızca onay bekleyen randevular iptal edilebilir."
+            });
+        }
+
+        _context.Appointments.Remove(appointment);
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Randevunuz başarıyla iptal edildi."
+        });
+    }
+
 }

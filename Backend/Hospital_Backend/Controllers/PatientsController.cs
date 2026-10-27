@@ -6,12 +6,12 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace Hospital_Backend.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
-[Authorize(Roles = "Staff,Manager")]
 public class PatientsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
@@ -23,6 +23,7 @@ public class PatientsController : ControllerBase
     }
 
     // Hastaları listele
+    [Authorize(Roles = "Staff,Manager")]
     [HttpGet]
     public async Task<IActionResult> GetPatients()
     {
@@ -44,6 +45,7 @@ public class PatientsController : ControllerBase
     }
 
     // Yeni hasta oluştur
+    [Authorize(Roles = "Staff,Manager")]
     [HttpPost]
     public async Task<IActionResult> CreatePatient(
         [FromBody] CreatePatientRequest request)
@@ -113,4 +115,217 @@ public class PatientsController : ControllerBase
             });
         }
     }
+
+    [Authorize(Roles = "Staff,Manager")]
+    [HttpPut("{id}")]
+    public async Task<IActionResult> UpdatePatient(
+        int id,
+        [FromBody] UpdatePatientRequest request)
+    {
+        var patient = await _context.Patient
+            .Include(p => p.UserAccount)
+            .SingleOrDefaultAsync(p => p.Id == id);
+
+        if (patient == null)
+        {
+            return NotFound(new
+            {
+                message = "Hasta bulunamadı."
+            });
+        }
+
+        var email = request.Email.Trim().ToLowerInvariant();
+
+        var emailExists = await _context.UserAccounts.AnyAsync(u =>
+            u.Email == email &&
+            u.Id != patient.UserAccountId);
+
+        if (emailExists)
+        {
+            return Conflict(new
+            {
+                message = "Bu e-posta adresi zaten kayıtlı."
+            });
+        }
+
+        patient.FullName = request.FullName.Trim();
+        patient.Age = request.Age;
+        patient.Gender = request.Gender.Trim();
+        patient.Phone = request.Phone?.Trim();
+
+        if (patient.UserAccount != null)
+        {
+            patient.UserAccount.FullName = patient.FullName;
+            patient.UserAccount.Email = email;
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Hasta bilgileri güncellendi.",
+            patient.Id,
+            patient.FullName,
+            patient.Age,
+            patient.Gender,
+            patient.Phone,
+            Email = patient.UserAccount?.Email
+        });
+    }
+
+    [Authorize(Roles = "Staff,Manager")]
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeletePatient(int id)
+    {
+        var patient = await _context.Patient
+            .SingleOrDefaultAsync(p => p.Id == id);
+
+        if (patient == null)
+        {
+            return NotFound(new
+            {
+                message = "Hasta bulunamadı."
+            });
+        }
+
+        var userAccountId = patient.UserAccountId;
+
+        await using var transaction =
+            await _context.Database.BeginTransactionAsync();
+
+        try
+        {
+            _context.Patient.Remove(patient);
+            await _context.SaveChangesAsync();
+
+            if (userAccountId.HasValue)
+            {
+                var user = await _context.UserAccounts
+                    .SingleOrDefaultAsync(u => u.Id == userAccountId.Value);
+
+                if (user != null)
+                {
+                    _context.UserAccounts.Remove(user);
+                    await _context.SaveChangesAsync();
+                }
+            }
+
+            await transaction.CommitAsync();
+
+            return Ok(new
+            {
+                message = "Hasta başarıyla silindi."
+            });
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync();
+
+            return Conflict(new
+            {
+                message = "Hasta silinemedi. İlişkili kayıtları kontrol edin."
+            });
+        }
+    }
+
+    [Authorize(Roles = "Patient,Staff,Manager")]
+    [HttpGet("my-profile")]
+    public async Task<IActionResult> GetMyProfile()
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (!int.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        var patient = await _context.Patient
+            .FirstOrDefaultAsync(p => p.UserAccountId == userId);
+
+        if (patient == null)
+            return NotFound(new { message = "Hasta kaydı bulunamadı." });
+
+        return Ok(new
+        {
+            patient.Id,
+            patient.FullName,
+            patient.Age,
+            patient.Gender,
+            patient.Phone
+        });
+    }
+
+    [Authorize(Roles = "Patient")]
+    [HttpPut("my-profile")]
+    public async Task<IActionResult> UpdateMyProfile(
+    [FromBody] UpdateMyPatientProfileRequest request)
+    {
+        var userIdClaim = User.FindFirstValue(
+            ClaimTypes.NameIdentifier);
+
+        if (!int.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new
+            {
+                message = "Kullanıcı kimliği doğrulanamadı."
+            });
+        }
+
+        var patient = await _context.Patient
+            .Include(p => p.UserAccount)
+            .SingleOrDefaultAsync(p => p.UserAccountId == userId);
+
+        if (patient == null)
+        {
+            return NotFound(new
+            {
+                message = "Hasta kaydı bulunamadı."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.FullName))
+        {
+            return BadRequest(new
+            {
+                message = "Ad soyad alanı zorunludur."
+            });
+        }
+
+        if (request.Age < 1 || request.Age > 100)
+        {
+            return BadRequest(new
+            {
+                message = "Yaş 1 ile 100 arasında olmalıdır."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Gender))
+        {
+            return BadRequest(new
+            {
+                message = "Cinsiyet alanı zorunludur."
+            });
+        }
+
+        patient.FullName = request.FullName.Trim();
+        patient.Age = request.Age;
+        patient.Gender = request.Gender.Trim();
+        patient.Phone = request.Phone?.Trim();
+
+        if (patient.UserAccount != null)
+        {
+            patient.UserAccount.FullName = patient.FullName;
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Bilgileriniz başarıyla güncellendi.",
+            patient.Id,
+            patient.FullName,
+            patient.Age,
+            patient.Gender,
+            patient.Phone
+        });
+    }
+
 }

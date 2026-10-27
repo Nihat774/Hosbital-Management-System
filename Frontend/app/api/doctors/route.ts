@@ -42,7 +42,7 @@ async function forwardRequest(
       cache: "no-store",
     };
 
-    if (method === "POST") {
+    if (method === "POST" && !token) {
       options.body = JSON.stringify(await request.json());
     }
 

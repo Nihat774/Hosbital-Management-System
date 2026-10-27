@@ -52,7 +52,7 @@ export default function Footer() {
 
           {/* For users */}
           <div>
-            <h3 className="font-semibold text-gray-900">İstifadəçilər</h3>
+            <h3 className="font-semibold text-gray-900">Kullanıcılar</h3>
 
             <ul className="mt-4 space-y-3 text-sm text-gray-500">
               <li>
@@ -78,7 +78,7 @@ export default function Footer() {
 
           {/* Contact */}
           <div>
-            <h3 className="font-semibold text-gray-900">Əlaqə</h3>
+            <h3 className="font-semibold text-gray-900">İletişim</h3>
 
             <ul className="mt-4 space-y-3 text-sm text-gray-500">
               <li>info@medicare.tr</li>

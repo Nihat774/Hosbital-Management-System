@@ -298,4 +298,121 @@ public class DoctorsController : ControllerBase
         }
     }
 
+
+    // Doktor yalnızca kendi profilini görüntüleyebilir.
+    [Authorize(Roles = "Doctor")]
+    [HttpGet("my-profile")]
+    public async Task<IActionResult> GetMyProfile()
+    {
+        var userIdClaim = User.FindFirst(
+            System.Security.Claims.ClaimTypes.NameIdentifier
+        )?.Value;
+
+        if (!int.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new
+            {
+                message = "Kullanıcı kimliği doğrulanamadı."
+            });
+        }
+
+        var doctor = await _context.Doctors
+            .Where(d => d.UserAccountId == userId)
+            .Select(d => new
+            {
+                d.Id,
+                d.FullName,
+                d.Email,
+                d.Gender,
+                d.Phone,
+                d.PhotoUrl,
+                d.Specialty,
+                d.ExperienceYears,
+                d.University,
+                d.About,
+                d.Languages
+            })
+            .FirstOrDefaultAsync();
+
+        if (doctor == null)
+        {
+            return NotFound(new
+            {
+                message = "Doktor profili bulunamadı."
+            });
+        }
+
+        return Ok(doctor);
+    }
+
+    // Doktor yalnızca kendi profilindeki kişisel bilgileri güncelleyebilir.
+    [Authorize(Roles = "Doctor")]
+    [HttpPut("my-profile")]
+    public async Task<IActionResult> UpdateMyProfile(
+        [FromBody] DoctorSelfUpdateRequest request)
+    {
+        var userIdClaim = User.FindFirst(
+            System.Security.Claims.ClaimTypes.NameIdentifier
+        )?.Value;
+
+        if (!int.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new
+            {
+                message = "Kullanıcı kimliği doğrulanamadı."
+            });
+        }
+
+        var doctor = await _context.Doctors
+            .Include(d => d.UserAccount)
+            .FirstOrDefaultAsync(d => d.UserAccountId == userId);
+
+        if (doctor == null)
+        {
+            return NotFound(new
+            {
+                message = "Doktor profili bulunamadı."
+            });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.FullName) ||
+            string.IsNullOrWhiteSpace(request.Phone))
+        {
+            return BadRequest(new
+            {
+                message = "Ad soyad ve telefon alanları zorunludur."
+            });
+        }
+
+        if (request.ExperienceYears < 0)
+        {
+            return BadRequest(new
+            {
+                message = "Deneyim yılı negatif olamaz."
+            });
+        }
+
+        doctor.FullName = request.FullName.Trim();
+        doctor.Phone = request.Phone.Trim();
+        doctor.Specialty = request.Specialty.Trim();
+        doctor.ExperienceYears = request.ExperienceYears;
+        doctor.University = request.University.Trim();
+        doctor.About = request.About?.Trim();
+        doctor.Languages = request.Languages?.Trim();
+
+        // Giriş hesabındaki ad da güncel kalsın.
+        if (doctor.UserAccount != null)
+        {
+            doctor.UserAccount.FullName = doctor.FullName;
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Profil bilgileriniz güncellendi."
+        });
+    }
+
+
 }

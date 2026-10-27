@@ -1,5 +1,5 @@
 import Link from "next/link";
-
+export const instant = false;
 type Doctor = {
   id: number;
   fullName: string;
