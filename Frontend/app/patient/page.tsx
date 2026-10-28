@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { logout } from "@/lib/logout";
-import { FiLogOut, FiTrash2 } from "react-icons/fi";
+import { FiCamera, FiLogOut, FiTrash2 } from "react-icons/fi";
 
 type Tab = "appointments" | "profile" | "doctors";
 
@@ -13,6 +13,7 @@ type PatientProfile = {
     age: number;
     gender: string;
     phone: string | null;
+    photoUrl: string | null;
 };
 
 type Doctor = {
@@ -77,6 +78,13 @@ export default function PatientPage() {
     const [profileMessage, setProfileMessage] = useState("");
     const [profileError, setProfileError] = useState("");
 
+
+    const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+    const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+    const [savingPhoto, setSavingPhoto] = useState(false);
+    const [photoMessage, setPhotoMessage] = useState("");
+    const [photoError, setPhotoError] = useState("");
+
     async function loadPatientProfile() {
         try {
             const response = await fetch("/api/patients/my-profile", {
@@ -95,6 +103,7 @@ export default function PatientPage() {
                 age: data.age ?? data.Age,
                 gender: data.gender ?? data.Gender ?? "",
                 phone: data.phone ?? data.Phone ?? null,
+                photoUrl: data.photoUrl ?? data.PhotoUrl ?? "/images/user-icon.avif"
             });
         } catch (err) {
             console.error("Profil yüklenemedi:", err);
@@ -121,6 +130,7 @@ export default function PatientPage() {
                     age: patient.age,
                     gender: patient.gender,
                     phone: patient.phone,
+                    photoUrl: patient.photoUrl
                 }),
             });
 
@@ -304,10 +314,76 @@ export default function PatientPage() {
         }
     }
 
+    function handlePhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
+        const file = event.target.files?.[0];
+
+        if (!file) return;
+
+        if (!file.type.startsWith("image/")) {
+            setPhotoError("Lütfen geçerli bir görsel dosyası seçin.");
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            setPhotoError("Fotoğraf boyutu en fazla 5 MB olabilir.");
+            return;
+        }
+
+        setSelectedPhoto(file);
+        setPhotoPreview(URL.createObjectURL(file));
+        setPhotoMessage("");
+        setPhotoError("");
+    }
+
+    async function savePatientPhoto() {
+        if (!selectedPhoto) {
+            setPhotoError("Lütfen önce bir fotoğraf seçin.");
+            return;
+        }
+
+        setSavingPhoto(true);
+        setPhotoMessage("");
+        setPhotoError("");
+
+        try {
+            const formData = new FormData();
+            formData.append("photo", selectedPhoto);
+
+            const response = await fetch("/api/patients/my-profile/photo", {
+                method: "PUT",
+                body: formData,
+            });
+
+            const data = await response.json().catch(() => null);
+
+            if (!response.ok) {
+                throw new Error(
+                    data?.message || "Profil fotoğrafı güncellenemedi."
+                );
+            }
+
+            setPhotoMessage("Profil fotoğrafınız başarıyla güncellendi.");
+            setSelectedPhoto(null);
+            setPhotoPreview(null);
+
+            await loadPatientProfile();
+        } catch (err) {
+            setPhotoError(
+                err instanceof Error
+                    ? err.message
+                    : "Fotoğraf güncellenirken bir hata oluştu."
+            );
+        } finally {
+            setSavingPhoto(false);
+        }
+    }
+
     const tabs: [Tab, string][] = [
         ["appointments", "Randevularım"],
         ["doctors", "Doktorlar"],
         ["profile", "Bilgilerim"],]
+    console.log(patient);
+
 
     return (
         <main className="min-h-screen bg-gray-50 px-4 py-8 sm:px-6 sm:py-10">
@@ -595,6 +671,71 @@ export default function PatientPage() {
                             <p className="mt-2 text-sm text-gray-500">
                                 Kişisel bilgilerinizi görüntüleyebilir ve güncelleyebilirsiniz.
                             </p>
+
+                            <div className="mt-6 flex flex-col gap-5 sm:flex-row sm:items-center">
+                                <div className="relative h-24 w-24 shrink-0">
+                                    <img
+                                        src={
+                                            photoPreview ||
+                                            (patient?.photoUrl
+                                                ? `http://localhost:5041${patient.photoUrl}`
+                                                : "/images/user-icon.avif") ||
+                                            "/images/user-icon.avif"
+                                        }
+                                        alt="Profil fotoğrafı"
+                                        className="h-24 w-24 rounded-full border border-gray-200 object-cover"
+                                    />
+
+                                    <label
+                                        htmlFor="profilePhoto"
+                                        className="absolute bottom-0 right-0 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-blue-600 text-white transition hover:bg-blue-700"
+                                        title="Fotoğraf seç"
+                                    >
+                                        <FiCamera size={16} />
+                                    </label>
+
+                                    <input
+                                        id="profilePhoto"
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handlePhotoChange}
+                                        className="hidden"
+                                    />
+                                </div>
+
+                                <div>
+                                    <h3 className="font-semibold text-gray-900">
+                                        {patient?.fullName || "Hasta"}
+                                    </h3>
+
+                                    <p className="mt-1 text-sm text-gray-500">
+                                        JPG, PNG veya diğer görsel formatları. En fazla 5 MB.
+                                    </p>
+
+                                    {selectedPhoto && (
+                                        <button
+                                            type="button"
+                                            onClick={savePatientPhoto}
+                                            disabled={savingPhoto}
+                                            className="mt-3 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                                        >
+                                            {savingPhoto ? "Yükleniyor..." : "Fotoğrafı Kaydet"}
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {photoMessage && (
+                                <p className="mt-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">
+                                    {photoMessage}
+                                </p>
+                            )}
+
+                            {photoError && (
+                                <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                                    {photoError}
+                                </p>
+                            )}
 
                             {loadingProfile ? (
                                 <p className="mt-6 text-gray-500">

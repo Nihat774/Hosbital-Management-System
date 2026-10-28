@@ -35,6 +35,7 @@ public class PatientsController : ControllerBase
                 p.Age,
                 p.Gender,
                 p.Phone,
+                p.PhotoUrl,
                 Email = p.UserAccount != null
                     ? p.UserAccount.Email
                     : null
@@ -87,6 +88,7 @@ public class PatientsController : ControllerBase
                 Age = request.Age,
                 Gender = request.Gender.Trim(),
                 Phone = request.Phone?.Trim(),
+                PhotoUrl = "/images/default-patient.png",
                 UserAccountId = user.Id
             };
 
@@ -159,6 +161,11 @@ public class PatientsController : ControllerBase
             patient.UserAccount.Email = email;
         }
 
+        if (!string.IsNullOrWhiteSpace(request.PhotoUrl))
+        {
+            patient.PhotoUrl = request.PhotoUrl;
+        }
+
         await _context.SaveChangesAsync();
 
         return Ok(new
@@ -169,7 +176,8 @@ public class PatientsController : ControllerBase
             patient.Age,
             patient.Gender,
             patient.Phone,
-            Email = patient.UserAccount?.Email
+            Email = patient.UserAccount?.Email,
+            patient.PhotoUrl
         });
     }
 
@@ -249,7 +257,8 @@ public class PatientsController : ControllerBase
             patient.FullName,
             patient.Age,
             patient.Gender,
-            patient.Phone
+            patient.Phone,
+            patient.PhotoUrl
         });
     }
 
@@ -324,8 +333,87 @@ public class PatientsController : ControllerBase
             patient.FullName,
             patient.Age,
             patient.Gender,
-            patient.Phone
+            patient.Phone,
+            patient.PhotoUrl
         });
     }
 
+
+    [Authorize(Roles = "Patient")]
+    [HttpPut("my-profile/photo")]
+    public async Task<IActionResult> UpdateMyProfilePhoto(
+    IFormFile photo)
+    {
+        var userIdClaim = User.FindFirstValue(
+            ClaimTypes.NameIdentifier);
+
+        if (!int.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized();
+        }
+
+        var patient = await _context.Patient
+            .SingleOrDefaultAsync(p => p.UserAccountId == userId);
+
+        if (patient == null)
+        {
+            return NotFound(new
+            {
+                message = "Hasta kaydı bulunamadı."
+            });
+        }
+
+        if (photo == null || photo.Length == 0)
+        {
+            return BadRequest(new
+            {
+                message = "Lütfen bir fotoğraf seçin."
+            });
+        }
+
+        if (photo.Length > 5 * 1024 * 1024)
+        {
+            return BadRequest(new
+            {
+                message = "Fotoğraf boyutu en fazla 5 MB olabilir."
+            });
+        }
+
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp" };
+        var extension = Path.GetExtension(photo.FileName).ToLowerInvariant();
+
+        if (!allowedExtensions.Contains(extension))
+        {
+            return BadRequest(new
+            {
+                message = "Yalnızca JPG, JPEG, PNG ve WEBP dosyaları kabul edilir."
+            });
+        }
+
+        var uploadsFolder = Path.Combine(
+            Directory.GetCurrentDirectory(),
+            "wwwroot",
+            "uploads",
+            "patients");
+
+        Directory.CreateDirectory(uploadsFolder);
+
+        var fileName = $"{Guid.NewGuid()}{extension}";
+        var filePath = Path.Combine(uploadsFolder, fileName);
+
+        await using (var stream = new FileStream(filePath, FileMode.Create))
+        {
+            await photo.CopyToAsync(stream);
+        }
+
+        patient.PhotoUrl = $"/uploads/patients/{fileName}";
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "Profil fotoğrafı başarıyla güncellendi.",
+            photoUrl = patient.PhotoUrl
+        });
+    }
 }

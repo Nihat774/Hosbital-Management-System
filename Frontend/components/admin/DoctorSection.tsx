@@ -82,7 +82,7 @@ export default function DoctorsSection() {
                 cache: "no-store",
             });
             const data = await response.json();
-
+            
             if (!response.ok) {
                 console.error("Doktor ekleme hatası:", data);
 

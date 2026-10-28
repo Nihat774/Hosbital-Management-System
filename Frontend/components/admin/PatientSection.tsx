@@ -16,6 +16,8 @@ type Patient = {
   Phone?: string | null;
   email?: string | null;
   Email?: string | null;
+  photoUrl: string | null,
+  PhotoUrl: string | null;
 };
 
 type PatientForm = {
@@ -63,6 +65,7 @@ export default function PatientSection() {
       }
 
       setPatients(Array.isArray(data) ? data : []);
+      console.log(data);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Bir hata oluştu."
@@ -140,10 +143,10 @@ export default function PatientSection() {
       if (!response.ok) {
         throw new Error(
           data?.message ||
-            data?.title ||
-            (isEditing
-              ? "Hasta güncellenemedi."
-              : "Hasta oluşturulamadı.")
+          data?.title ||
+          (isEditing
+            ? "Hasta güncellenemedi."
+            : "Hasta oluşturulamadı.")
         );
       }
 
@@ -405,6 +408,7 @@ export default function PatientSection() {
           <table className="w-full min-w-[850px] text-left text-sm">
             <thead className="border-b bg-gray-50 text-gray-600">
               <tr>
+                <th className="px-4 py-3">Foto</th>
                 <th className="px-4 py-3">Ad Soyad</th>
                 <th className="px-4 py-3">E-posta</th>
                 <th className="px-4 py-3">Yaş</th>
@@ -420,6 +424,17 @@ export default function PatientSection() {
                   key={patient.id ?? patient.Id}
                   className="border-b last:border-0 hover:bg-gray-50"
                 >
+                  <td className="px-4 py-4">
+                    <img
+                      className="size-[25px] rounded-full object-cover"
+                      src={
+                        patient.photoUrl
+                          ? `http://localhost:5041${patient.photoUrl}`
+                          : "/images/user-icon.avif"
+                      }
+                      alt="photo"
+                    />
+                  </td>
                   <td className="px-4 py-4 font-semibold">
                     {patient.fullName ?? patient.FullName ?? "-"}
                   </td>

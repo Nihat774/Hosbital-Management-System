@@ -94,8 +94,8 @@ namespace Hospital_Backend
                 app.UseSwaggerUI();
             }
 
+            app.UseStaticFiles(); 
             app.UseCors("Frontend");
-
             app.UseHttpsRedirection();
 
             app.UseAuthentication();
