@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "node:crypto";
 
 export async function POST(request: NextRequest) {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
   try {
     const token = request.cookies.get("auth_token")?.value;
 
@@ -13,9 +16,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-    const apiKey = process.env.CLOUDINARY_API_KEY;
-    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
 
     if (!cloudName || !apiKey || !apiSecret) {
       return NextResponse.json(
@@ -84,32 +85,32 @@ export async function POST(request: NextRequest) {
     const result = await response.json();
 
     if (!response.ok) {
-  console.error("Cloudinary hata yanıtı:", result);
+      console.error("Cloudinary hata yanıtı:", result);
 
-  return NextResponse.json(
-    {
-      message:
-        result?.error?.message ||
-        "Fotoğraf Cloudinary'ye yüklenemedi.",
-    },
-    { status: 502 }
-  );
-}
+      return NextResponse.json(
+        {
+          message:
+            result?.error?.message ||
+            "Fotoğraf Cloudinary'ye yüklenemedi.",
+        },
+        { status: 502 }
+      );
+    }
 
     return NextResponse.json({
       url: result.secure_url,
     });
   } catch (error) {
-  console.error("Cloudinary upload hatası:", error);
+    console.error("Cloudinary upload hatası:", error);
 
-  return NextResponse.json(
-    {
-      message:
-        error instanceof Error
-          ? error.message
-          : "Bilinmeyen bir hata oluştu.",
-    },
-    { status: 500 }
-  );
+    return NextResponse.json(
+      {
+        message:
+          error instanceof Error
+            ? error.message
+            : "Bilinmeyen bir hata oluştu.",
+      },
+      { status: 500 }
+    );
   }
 }

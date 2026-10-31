@@ -38,9 +38,10 @@ public class PatientsController : ControllerBase
                 p.PhotoUrl,
                 Email = p.UserAccount != null
                     ? p.UserAccount.Email
-                    : null
-            })
-            .ToListAsync();
+                    : null,
+                IsEmailVerified = p.UserAccount != null
+                 && p.UserAccount.IsEmailVerified
+                }).ToListAsync();
 
         return Ok(patients);
     }
@@ -155,6 +156,11 @@ public class PatientsController : ControllerBase
         patient.Gender = request.Gender.Trim();
         patient.Phone = request.Phone?.Trim();
 
+        if (request.PhotoUrl != null)
+        {
+            patient.PhotoUrl = request.PhotoUrl;
+        }
+
         if (patient.UserAccount != null)
         {
             patient.UserAccount.FullName = patient.FullName;
@@ -165,7 +171,7 @@ public class PatientsController : ControllerBase
         {
             patient.PhotoUrl = request.PhotoUrl;
         }
-
+        Console.WriteLine($"Gelen PhotoUrl: {request.PhotoUrl}");
         await _context.SaveChangesAsync();
 
         return Ok(new
@@ -318,6 +324,7 @@ public class PatientsController : ControllerBase
         patient.Age = request.Age;
         patient.Gender = request.Gender.Trim();
         patient.Phone = request.Phone?.Trim();
+        patient.PhotoUrl = request.PhotoUrl;
 
         if (patient.UserAccount != null)
         {

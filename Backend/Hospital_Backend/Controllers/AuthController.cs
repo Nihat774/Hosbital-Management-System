@@ -1,13 +1,15 @@
 ﻿using Hospital_Backend.Data;
 using Hospital_Backend.DTOs;
 using Hospital_Backend.Models;
+using Hospital_Backend.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 namespace Hospital_Backend.Controllers;
 
 [Route("api/[controller]")]
@@ -16,10 +18,14 @@ public class AuthController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly PasswordHasher<UserAccount> _passwordHasher;
+    private readonly EmailService _emailService;
 
-    public AuthController(ApplicationDbContext context) 
+    public AuthController(
+        ApplicationDbContext context,
+        EmailService emailService)
     {
         _context = context;
+        _emailService = emailService;
         _passwordHasher = new PasswordHasher<UserAccount>();
     }
 
@@ -64,14 +70,52 @@ public class AuthController : ControllerBase
 
         var email = request.Email.Trim().ToLowerInvariant();
 
-        var emailExists = await _context.UserAccounts
-            .AnyAsync(user => user.Email == email);
+        var existingUser = await _context.UserAccounts
+    .FirstOrDefaultAsync(user => user.Email == email);
 
-        if (emailExists)
+        if (existingUser != null)
         {
-            return Conflict(new
+            if (existingUser.IsEmailVerified)
             {
-                message = "Bu e-posta adresi kayıtlıdır."
+                return Conflict(new
+                {
+                    message = "Bu e-posta adresi kayıtlı."
+                });
+            }
+
+            var verificationToken = Convert.ToHexString(
+                RandomNumberGenerator.GetBytes(32));
+
+            var verificationTokenHash = Convert.ToHexString(
+                SHA256.HashData(
+                    Encoding.UTF8.GetBytes(verificationToken)));
+
+            existingUser.EmailVerificationTokenHash = verificationTokenHash;
+            existingUser.EmailVerificationTokenExpiresAt =
+                DateTime.UtcNow.AddHours(24);
+
+            await _context.SaveChangesAsync();
+
+            var verificationLink =
+                $"http://localhost:3000/verify-email?token={verificationToken}&email={Uri.EscapeDataString(existingUser.Email)}";
+
+            try
+            {
+                await _emailService.SendVerificationEmailAsync(
+                    existingUser.Email,
+                    verificationLink);
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Doğrulama e-postası gönderilemedi. Lütfen tekrar deneyin."
+                });
+            }
+
+            return Ok(new
+            {
+                message = "Bu e-posta adresi henüz doğrulanmamış. Yeni doğrulama bağlantısı gönderildi."
             });
         }
 
@@ -80,11 +124,19 @@ public class AuthController : ControllerBase
 
         try
         {
+            var verificationToken = Convert.ToHexString(
+             RandomNumberGenerator.GetBytes(32));
+
+            var verificationTokenHash = Convert.ToHexString(
+                SHA256.HashData(Encoding.UTF8.GetBytes(verificationToken)));
             var user = new UserAccount
             {
                 FullName = request.FullName.Trim(),
                 Email = email,
-                Role = "Patient"
+                Role = "Patient",
+                IsEmailVerified = false,
+                EmailVerificationTokenHash = verificationTokenHash,
+                EmailVerificationTokenExpiresAt = DateTime.UtcNow.AddHours(24)
             };
 
             user.PasswordHash = _passwordHasher.HashPassword(
@@ -110,6 +162,25 @@ public class AuthController : ControllerBase
 
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
+
+            var verificationLink =
+                $"http://localhost:3000/verify-email?token={verificationToken}&email={Uri.EscapeDataString(user.Email)}";
+
+            try
+            {
+                await _emailService.SendVerificationEmailAsync(
+                    user.Email,
+                    verificationLink);
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Hesap oluşturuldu ancak doğrulama e-postası gönderilemedi. Lütfen daha sonra tekrar deneyin."
+                });
+            }
+
+            
 
             return StatusCode(201, new
             {
@@ -182,7 +253,13 @@ public class AuthController : ControllerBase
         user.Role
     )
 };
-
+        if (!user.IsEmailVerified)
+        {
+            return Unauthorized(new
+            {
+                message = "Giriş yapmadan önce e-posta adresinizi doğrulayın."
+            });
+        }
         var token = new System.IdentityModel.Tokens.Jwt.JwtSecurityToken(
             issuer: HttpContext.RequestServices
                 .GetRequiredService<IConfiguration>()["Jwt:Issuer"],
@@ -211,7 +288,75 @@ public class AuthController : ControllerBase
         });
     }
 
+    [HttpGet("verify-email")]
+    public async Task<IActionResult> VerifyEmail(
+    [FromQuery] string token,
+    [FromQuery] string email)
+    {
+        if (string.IsNullOrWhiteSpace(token) ||
+            string.IsNullOrWhiteSpace(email))
+        {
+            return BadRequest(new
+            {
+                message = "Doğrulama bağlantısı geçersiz."
+            });
+        }
 
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+
+        var user = await _context.UserAccounts
+            .FirstOrDefaultAsync(u => u.Email == normalizedEmail);
+
+        if (user == null)
+        {
+            return BadRequest(new
+            {
+                message = "Kullanıcı bulunamadı."
+            });
+        }
+
+        if (user.IsEmailVerified)
+        {
+            return Ok(new
+            {
+                message = "E-posta adresiniz doğrulandı."
+            });
+        }
+
+        if (string.IsNullOrEmpty(user.EmailVerificationTokenHash) ||
+            user.EmailVerificationTokenExpiresAt == null ||
+            user.EmailVerificationTokenExpiresAt <= DateTime.UtcNow)
+        {
+            return BadRequest(new
+            {
+                message = "Doğrulama bağlantısının süresi dolmuş veya bağlantı geçersiz."
+            });
+        }
+
+        var tokenHash = Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+
+        if (!CryptographicOperations.FixedTimeEquals(
+            Convert.FromHexString(tokenHash),
+            Convert.FromHexString(user.EmailVerificationTokenHash)))
+        {
+            return BadRequest(new
+            {
+                message = "Doğrulama bağlantısı geçersiz."
+            });
+        }
+
+        user.IsEmailVerified = true;
+        user.EmailVerificationTokenHash = null;
+        user.EmailVerificationTokenExpiresAt = null;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = "E-posta adresiniz başarıyla doğrulandı. Artık giriş yapabilirsiniz."
+        });
+    }
 }
 
 

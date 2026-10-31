@@ -11,4 +11,7 @@ public class UserAccount
     public Patient? Patient { get; set; }
     public Doctor? Doctor { get; set; }
     public Staff? Staff { get; set; }
+    public bool IsEmailVerified { get; set; } = false;
+    public string? EmailVerificationTokenHash { get; set; }
+    public DateTime? EmailVerificationTokenExpiresAt { get; set; }
 }

@@ -30,6 +30,8 @@ type Doctor = {
     About?: string | null;
     languages?: string | null;
     Languages?: string | null;
+    isEmailVerified: boolean | null;
+    IsEmailVerified:boolean | null;
 };
 
 type DoctorForm = {
@@ -82,7 +84,7 @@ export default function DoctorsSection() {
                 cache: "no-store",
             });
             const data = await response.json();
-            
+
             if (!response.ok) {
                 console.error("Doktor ekleme hatası:", data);
 
@@ -280,6 +282,7 @@ export default function DoctorsSection() {
             setDeletingDoctorId(null);
         }
     }
+
 
 
 
@@ -546,6 +549,7 @@ export default function DoctorsSection() {
                                 <th className="px-4 py-3">Uzmanlık</th>
                                 <th className="px-4 py-3">Deneyim</th>
                                 <th className="px-4 py-3">E-posta</th>
+                                <th className="px-4 py-3">E-posta Status</th>
                                 <th className="px-4 py-3">İşlemler</th>
                             </tr>
                         </thead>
@@ -574,6 +578,18 @@ export default function DoctorsSection() {
                                         {doctor.email ?? doctor.Email}
                                     </td>
 
+
+                                    <td className="px-4 py-4">
+                                        {(doctor.isEmailVerified ?? doctor.IsEmailVerified) ? (
+                                            <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
+                                                Doğrulandı
+                                            </span>
+                                        ) : (
+                                            <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
+                                                Doğrulanmadı
+                                            </span>
+                                        )}
+                                    </td>
 
                                     <td className="px-4 py-4">
                                         <div className="flex items-center gap-2">

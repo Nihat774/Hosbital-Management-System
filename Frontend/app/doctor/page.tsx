@@ -3,6 +3,7 @@
 
 import { logout } from "@/lib/logout";
 import { useEffect, useState } from "react";
+import { FiCamera } from "react-icons/fi";
 
 type Appointment = {
     id: number;
@@ -10,6 +11,7 @@ type Appointment = {
     patientAge: number;
     patientPhone: string | null;
     appointmentDate: string;
+    patientEmail: string,
     status: "Pending" | "Approved" | "Rejected";
 };
 
@@ -42,6 +44,11 @@ export default function DoctorPage() {
     const [profileError, setProfileError] = useState("");
     const [profileMessage, setProfileMessage] = useState("");
     const [savingProfile, setSavingProfile] = useState(false);
+
+    const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+    const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+    const [savingPhoto, setSavingPhoto] = useState(false);
+    console.log(appointments);
 
     async function loadAppointments() {
         try {
@@ -100,9 +107,9 @@ export default function DoctorPage() {
     }
 
     useEffect(() => {
-    loadAppointments();
-    loadProfile();
-}, []);
+        loadAppointments();
+        loadProfile();
+    }, []);
 
     async function updateAppointment(
         id: number,
@@ -167,6 +174,8 @@ export default function DoctorPage() {
                     university: profile.university,
                     about: profile.about ?? "",
                     languages: profile.languages ?? "",
+                    photoUrl: profile.photoUrl,
+                    gender:profile.gender
                 }),
             });
 
@@ -192,6 +201,111 @@ export default function DoctorPage() {
         }
     }
 
+    function handlePhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
+        const file = event.target.files?.[0];
+
+        if (!file) return;
+
+        if (!file.type.startsWith("image/")) {
+            setProfileError("Lütfen geçerli bir fotoğraf seçin.");
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            setProfileError("Fotoğraf boyutu en fazla 5 MB olabilir.");
+            return;
+        }
+
+        if (photoPreview) {
+            URL.revokeObjectURL(photoPreview);
+        }
+
+        setSelectedPhoto(file);
+        setPhotoPreview(URL.createObjectURL(file));
+        setProfileError("");
+        setProfileMessage("");
+    }
+
+    async function saveDoctorPhoto() {
+        if (!selectedPhoto || !profile) {
+            setProfileError("Lütfen önce bir fotoğraf seçin.");
+            return;
+        }
+
+        setSavingPhoto(true);
+        setProfileError("");
+        setProfileMessage("");
+
+        try {
+            // 1. Fotoğrafı Cloudinary'ye yükle
+            const formData = new FormData();
+            formData.append("file", selectedPhoto);
+
+            const uploadResponse = await fetch("/api/doctors/upload", {
+                method: "POST",
+                body: formData,
+            });
+
+            const uploadData = await uploadResponse.json();
+
+            if (!uploadResponse.ok || !uploadData?.url) {
+                throw new Error(
+                    uploadData?.message || "Fotoğraf yüklenemedi."
+                );
+            }
+
+            // 2. Cloudinary URL'sini backend'e gönder
+            const updateResponse = await fetch("/api/doctors/my-profile", {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    fullName: profile.fullName,
+                    phone: profile.phone ?? "",
+                    specialty: profile.specialty,
+                    experienceYears: profile.experienceYears,
+                    university: profile.university,
+                    about: profile.about ?? "",
+                    languages: profile.languages ?? "",
+                    photoUrl: uploadData.url,
+                }),
+            });
+
+            const updateData = await updateResponse.json().catch(() => null);
+
+            if (!updateResponse.ok) {
+                throw new Error(
+                    updateData?.message || "Profil fotoğrafı kaydedilemedi."
+                );
+            }
+
+            setProfile((current) =>
+                current ? { ...current, photoUrl: uploadData.url } : current
+            );
+
+            setSelectedPhoto(null);
+
+            if (photoPreview) {
+                URL.revokeObjectURL(photoPreview);
+            }
+
+            setPhotoPreview(null);
+
+            setProfileMessage("Profil fotoğrafınız başarıyla güncellendi.");
+
+            await loadProfile();
+
+        } catch (err) {
+            setProfileError(
+                err instanceof Error ? err.message : "Bir hata oluştu."
+            );
+        } finally {
+            setSavingPhoto(false);
+        }
+    }
+
+
     const inputClass =
         "w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10";
 
@@ -201,58 +315,54 @@ export default function DoctorPage() {
 
 
 
-               
-<div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-    <div className="flex flex-col gap-6 p-6 sm:p-8 md:flex-row md:items-center md:justify-between">
-        {/* Doktor bilgileri */}
-        <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-xl font-bold text-blue-700">
-                {profile?.fullName
-                    ? profile.fullName
-                        .split(" ")
-                        .filter(Boolean)
-                        .slice(0, 2)
-                        .map((name) => name[0])
-                        .join("")
-                        .toUpperCase()
-                    : "DR"}
-            </div>
 
-            <div>
-                <p className="text-sm font-medium text-gray-500">
-                    Hoş geldiniz,
-                </p>
-                <h2 className="mt-1 text-xl font-bold text-gray-900 sm:text-2xl">
-                    {profile?.fullName || "Doktor"}
-                </h2>
-                <span className="mt-2 inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                    {profile?.specialty || "Uzmanlık alanı"}
-                </span>
-            </div>
-        </div>
+                <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+                    <div className="flex flex-col gap-6 p-6 sm:p-8 md:flex-row md:items-center md:justify-between">
+                        {/* Doktor bilgileri */}
+                        <div className="flex items-center gap-4">
+                            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-2xl text-blue-700">
+                                <img
+                                    src={profile?.photoUrl || "/images/user-icon.avif"}
+                                    alt="Profil fotoğrafı"
+                                    className="h-14 w-14 rounded-2xl object-cover"
+                                />
+                            </div>
 
-        {/* Panel başlığı ve çıkış */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center md:justify-end">
-            <div className="md:text-right">
-                <h1 className="text-2xl font-bold tracking-tight text-gray-900">
-                    Doktor Paneli
-                </h1>
-                <p className="mt-1 max-w-sm text-sm leading-6 text-gray-500 md:ml-auto">
-                    Randevularınızı ve profil bilgilerinizi buradan yönetin.
-                </p>
-            </div>
+                            <div>
+                                <p className="text-sm font-medium text-gray-500">
+                                    Hoş geldiniz,
+                                </p>
+                                <h2 className="mt-1 text-xl font-bold text-gray-900 sm:text-2xl">
+                                    Dr. {profile?.fullName || "Doktor"}
+                                </h2>
+                                <span className="mt-2 inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                                    {profile?.specialty || "Uzmanlık alanı"}
+                                </span>
+                            </div>
+                        </div>
 
-            <button
-                type="button"
-                onClick={logout}
-                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-100"
-            >
-                <span aria-hidden="true">↪</span>
-                Çıkış Yap
-            </button>
-        </div>
-    </div>
-</div>
+                        {/* Panel başlığı ve çıkış */}
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center md:justify-end">
+                            <div className="md:text-right">
+                                <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+                                    Doktor Paneli
+                                </h1>
+                                <p className="mt-1 max-w-sm text-sm leading-6 text-gray-500 md:ml-auto">
+                                    Randevularınızı ve profil bilgilerinizi buradan yönetin.
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={logout}
+                                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-100"
+                            >
+                                <span aria-hidden="true">↪</span>
+                                Çıkış Yap
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
 
 
@@ -309,11 +419,50 @@ export default function DoctorPage() {
                                         Profil Bilgilerim
                                     </h2>
                                     <p className="mt-1 text-sm text-gray-500">
-                                       Kişisel ve mesleki bilgilerinizi düzenleyebilirsiniz.
+                                        Kişisel ve mesleki bilgilerinizi düzenleyebilirsiniz.
                                     </p>
                                 </div>
+                                <div className="relative h-24 w-24 mb-5 shrink-0">
+                                    <img
+                                        src={
+                                            photoPreview ||
+                                            profile.photoUrl ||
+                                            "/images/user-icon.avif"
+                                        }
+                                        alt="Profil fotoğrafı"
+                                        className="h-24 w-24 rounded-full object-cover"
+                                    />
+
+                                    <label
+                                        htmlFor="profilePhoto"
+                                        className="absolute bottom-0 right-0 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border-2 border-white bg-blue-600 text-white transition hover:bg-blue-700"
+                                        title="Fotoğraf seç"
+                                    >
+                                        <FiCamera size={16} />
+                                    </label>
+
+                                    <input
+                                        id="profilePhoto"
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handlePhotoChange}
+                                        className="hidden"
+                                    />
+                                </div>
+                                {selectedPhoto && (
+                                    <button
+                                        type="button"
+                                        onClick={saveDoctorPhoto}
+                                        disabled={savingPhoto}
+                                        className="mb-5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+                                    >
+                                        {savingPhoto ? "Yükleniyor..." : "Fotoğrafı Kaydet"}
+                                    </button>
+                                )}
 
                                 <div className="grid gap-5 md:grid-cols-2">
+
+
                                     <div>
                                         <label className="mb-2 block text-sm font-semibold text-gray-700">
                                             Ad Soyad
@@ -408,11 +557,18 @@ export default function DoctorPage() {
                                         <label className="mb-2 block text-sm font-semibold text-gray-700">
                                             Cinsiyet
                                         </label>
-                                        <input
+
+                                        <select
+                                            required
                                             value={profile.gender}
-                                            readOnly
-                                            className={`${inputClass} bg-gray-100 text-gray-500`}
-                                        />
+                                            onChange={(e) =>
+                                                updateProfileField("gender", e.target.value)
+                                            }
+                                            className={inputClass}
+                                        >
+                                            <option value="Erkek">Erkek</option>
+                                            <option value="Kadın">Kadın</option>
+                                        </select>
                                     </div>
 
                                     <div>
@@ -499,7 +655,14 @@ export default function DoctorPage() {
                                                 {appointment.patientName}
                                             </h2>
 
-                                            <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                                            <span
+                                                className={`rounded-full px-3 py-1 text-xs font-semibold ${appointment.status === "Pending"
+                                                    ? "bg-yellow-100 text-yellow-700"
+                                                    : appointment.status === "Approved"
+                                                        ? "bg-green-100 text-green-700"
+                                                        : "bg-red-100 text-red-700"
+                                                    }`}
+                                            >
                                                 {appointment.status === "Pending"
                                                     ? "Beklemede"
                                                     : appointment.status === "Approved"
@@ -518,6 +681,10 @@ export default function DoctorPage() {
                                                 {appointment.patientPhone || "Belirtilmemiş"}
                                             </p>
                                             <p>
+                                                <strong>E-posta:</strong>{" "}
+                                                {appointment.patientEmail}
+                                            </p>
+                                            <p>
                                                 <strong>Randevu tarihi:</strong>{" "}
                                                 {new Date(
                                                     appointment.appointmentDate
@@ -525,15 +692,12 @@ export default function DoctorPage() {
                                             </p>
                                         </div>
 
-                                        {appointment.status === "Pending" && (
-                                            <div className="mt-5 flex gap-3">
+                                        <div className="mt-5 flex gap-3">
+                                            {appointment.status !== "Approved" && (
                                                 <button
                                                     disabled={updatingId !== null}
                                                     onClick={() =>
-                                                        updateAppointment(
-                                                            appointment.id,
-                                                            "approve"
-                                                        )
+                                                        updateAppointment(appointment.id, "approve")
                                                     }
                                                     className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
                                                 >
@@ -541,23 +705,22 @@ export default function DoctorPage() {
                                                         ? "İşleniyor..."
                                                         : "Onayla"}
                                                 </button>
+                                            )}
 
+                                            {appointment.status !== "Rejected" && (
                                                 <button
                                                     disabled={updatingId !== null}
                                                     onClick={() =>
-                                                        updateAppointment(
-                                                            appointment.id,
-                                                            "reject"
-                                                        )
+                                                        updateAppointment(appointment.id, "reject")
                                                     }
-                                                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                                                    className="rounded-lg bg-red-600 cursor-pointer px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                                                 >
                                                     {updatingId === appointment.id
                                                         ? "İşleniyor..."
                                                         : "Reddet"}
                                                 </button>
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
                             </div>

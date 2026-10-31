@@ -2,10 +2,13 @@
 using Hospital_Backend.Data;
 using Hospital_Backend.DTOs;
 using Hospital_Backend.Models;
+using Hospital_Backend.Services;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Identity;
+using System.Security.Cryptography;
+using System.Text;
 namespace Hospital_Backend.Controllers;
 
 [Route("api/[controller]")]
@@ -13,11 +16,14 @@ namespace Hospital_Backend.Controllers;
 public class DoctorsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
+    private readonly EmailService _emailService;
 
-    public DoctorsController(ApplicationDbContext context)
+    public DoctorsController(ApplicationDbContext context, EmailService emailService)
     {
         _context = context;
+        _emailService = emailService;
     }
+    
 
     // Herkes doktorları listeleyebilir.
     [AllowAnonymous]
@@ -37,7 +43,9 @@ public class DoctorsController : ControllerBase
                 d.ExperienceYears,
                 d.University,
                 d.About,
-                d.Languages
+                d.Languages,
+                IsEmailVerified = d.UserAccount != null
+                && d.UserAccount.IsEmailVerified
             })
             .ToListAsync();
 
@@ -108,11 +116,22 @@ public class DoctorsController : ControllerBase
         try
         {
             // Önce giriş hesabını oluşturuyoruz.
+            // Önce giriş hesabını oluşturuyoruz.
+            var verificationToken = Convert.ToHexString(
+                RandomNumberGenerator.GetBytes(32));
+
+            var verificationTokenHash = Convert.ToHexString(
+                SHA256.HashData(
+                    Encoding.UTF8.GetBytes(verificationToken)));
+
             var user = new UserAccount
             {
                 FullName = request.FullName.Trim(),
                 Email = email,
-                Role = "Doctor"
+                Role = "Doctor",
+                IsEmailVerified = false,
+                EmailVerificationTokenHash = verificationTokenHash,
+                EmailVerificationTokenExpiresAt = DateTime.UtcNow.AddHours(24)
             };
 
             var passwordHasher = new PasswordHasher<UserAccount>();
@@ -124,6 +143,8 @@ public class DoctorsController : ControllerBase
 
             _context.UserAccounts.Add(user);
             await _context.SaveChangesAsync();
+
+            
 
             // Ardından doktor profilini oluşturup hesapla ilişkilendiriyoruz.
             var doctor = new Doctor
@@ -145,6 +166,24 @@ public class DoctorsController : ControllerBase
             await _context.SaveChangesAsync();
 
             await transaction.CommitAsync();
+
+            var verificationLink =
+    $"http://localhost:3000/verify-email?token={verificationToken}&email={Uri.EscapeDataString(user.Email)}";
+
+            try
+            {
+                Console.WriteLine($"Doğrulama e-postası gönderiliyor: {user.Email}");
+                await _emailService.SendVerificationEmailAsync(
+                    user.Email,
+                    verificationLink);
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Doktor hesabı oluşturuldu ancak doğrulama e-postası gönderilemedi."
+                });
+            }
 
             return CreatedAtAction(
                 nameof(GetDoctor),
@@ -399,7 +438,8 @@ public class DoctorsController : ControllerBase
         doctor.University = request.University.Trim();
         doctor.About = request.About?.Trim();
         doctor.Languages = request.Languages?.Trim();
-
+        doctor.PhotoUrl = request.PhotoUrl;
+        doctor.Gender = request.Gender;
         // Giriş hesabındaki ad da güncel kalsın.
         if (doctor.UserAccount != null)
         {

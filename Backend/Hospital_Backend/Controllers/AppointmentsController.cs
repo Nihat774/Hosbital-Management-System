@@ -217,18 +217,23 @@ public class AppointmentsController : ControllerBase
         }
 
         var appointments = await _context.Appointments
-            .Where(a => a.DoctorId == doctor.Id)
-            .OrderBy(a => a.AppointmentDate)
-            .Select(a => new
-            {
-                a.Id,
-                PatientName = a.Patient.FullName,
-                PatientAge = a.Patient.Age,
-                PatientPhone = a.Patient.Phone,
-                a.AppointmentDate,
-                Status = a.Status.ToString()
-            })
-            .ToListAsync();
+    .Where(a => a.DoctorId == doctor.Id)
+    .OrderBy(a => a.AppointmentDate)
+    .Select(a => new
+    {
+        a.Id,
+        PatientName = a.Patient.FullName,
+        PatientAge = a.Patient.Age,
+        PatientPhone = a.Patient.Phone,
+
+        PatientEmail = a.Patient.UserAccount != null
+            ? a.Patient.UserAccount.Email
+            : null,
+
+        a.AppointmentDate,
+        Status = a.Status.ToString()
+    })
+    .ToListAsync();
 
         return Ok(appointments);
     }
@@ -277,13 +282,7 @@ public class AppointmentsController : ControllerBase
             return Forbid();
         }
 
-        if (appointment.Status != AppointmentStatus.Pending)
-        {
-            return BadRequest(new
-            {
-                message = "Yalnızca bekleyen randevular onaylanabilir."
-            });
-        }
+        
 
         appointment.Status = AppointmentStatus.Approved;
 
@@ -339,13 +338,7 @@ public class AppointmentsController : ControllerBase
             return Forbid();
         }
 
-        if (appointment.Status != AppointmentStatus.Pending)
-        {
-            return BadRequest(new
-            {
-                message = "Yalnızca bekleyen randevular reddedilebilir."
-            });
-        }
+       
 
         appointment.Status = AppointmentStatus.Rejected;
 

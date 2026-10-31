@@ -18,6 +18,8 @@ type Patient = {
   Email?: string | null;
   photoUrl: string | null,
   PhotoUrl: string | null;
+  IsEmailVerified: boolean | null;
+  isEmailVerified: boolean | null;
 };
 
 type PatientForm = {
@@ -208,6 +210,9 @@ export default function PatientSection() {
       );
     }
   }
+
+  console.log(patients);
+
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6">
@@ -414,7 +419,10 @@ export default function PatientSection() {
                 <th className="px-4 py-3">Yaş</th>
                 <th className="px-4 py-3">Cinsiyet</th>
                 <th className="px-4 py-3">Telefon</th>
+                <th className="px-4 py-3">Email status</th>
                 <th className="px-4 py-3">İşlemler</th>
+
+
               </tr>
             </thead>
 
@@ -429,7 +437,7 @@ export default function PatientSection() {
                       className="size-[25px] rounded-full object-cover"
                       src={
                         patient.photoUrl
-                          ? `http://localhost:5041${patient.photoUrl}`
+                          ? `${patient.photoUrl}`
                           : "/images/user-icon.avif"
                       }
                       alt="photo"
@@ -450,6 +458,20 @@ export default function PatientSection() {
                   <td className="px-4 py-4">
                     {patient.phone ?? patient.Phone ?? "-"}
                   </td>
+
+                  <td className="px-4 py-4">
+                    {patient.isEmailVerified ?? patient.IsEmailVerified ? (
+                      <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
+                        Doğrulandı
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
+                        Doğrulanmadı
+                      </span>
+                    )}
+                  </td>
+
+                  {/* işlemler */}
                   <td className="px-4 py-4">
                     <div className="flex gap-2">
                       <button
@@ -468,6 +490,7 @@ export default function PatientSection() {
                       </button>
                     </div>
                   </td>
+
                 </tr>
               ))}
             </tbody>

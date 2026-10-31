@@ -1,11 +1,12 @@
 
 using Hospital_Backend.Data;
+using Hospital_Backend.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi;
 using System.Security.Claims;
 using System.Text;
-using Microsoft.OpenApi;
 namespace Hospital_Backend
 {
     public class Program
@@ -85,7 +86,9 @@ namespace Hospital_Backend
 
             // Yetkilendirme
             builder.Services.AddAuthorization();
-
+            builder.Services.Configure<EmailSettings>(
+            builder.Configuration.GetSection("EmailSettings"));
+            builder.Services.AddScoped<EmailService>();
             var app = builder.Build();
 
             if (app.Environment.IsDevelopment())

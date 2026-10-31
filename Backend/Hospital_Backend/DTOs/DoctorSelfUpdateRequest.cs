@@ -10,4 +10,6 @@ public class DoctorSelfUpdateRequest
     public string University { get; set; } = string.Empty;
     public string? About { get; set; }
     public string? Languages { get; set; }
+    public string? PhotoUrl { get; set; }
+    public string Gender { get; set; }
 }

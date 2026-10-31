@@ -161,7 +161,7 @@ export default async function DoctorDetailsPage({
             </div>
 
             <Link
-              href={`/appointments?doctor=${doctor.id}`}
+              href={`/login`}
               className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
             >
               Randevu Al
@@ -287,7 +287,7 @@ export default async function DoctorDetailsPage({
               </p>
 
               <Link
-                href={`/appointments?doctor=${doctor.id}`}
+                href={`/login`}
                 className="mt-5 inline-flex w-full items-center justify-center rounded-lg bg-white px-4 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
               >
                 Randevu Oluştur

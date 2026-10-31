@@ -1,11 +1,14 @@
 ﻿
 using Hospital_Backend.Data;
 using Hospital_Backend.Models;
+using Hospital_Backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Hospital_Backend.Controllers;
 
@@ -15,10 +18,12 @@ namespace Hospital_Backend.Controllers;
 public class StaffController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
+    private readonly EmailService _emailService;
 
-    public StaffController(ApplicationDbContext context)
+    public StaffController(ApplicationDbContext context,EmailService emailService)
     {
         _context = context;
+        _emailService = emailService;
     }
 
     // Tüm personelleri listele
@@ -63,16 +68,28 @@ public class StaffController : ControllerBase
 
         try
         {
+            var verificationToken = Convert.ToHexString(
+     RandomNumberGenerator.GetBytes(32));
+
+            var verificationTokenHash = Convert.ToHexString(
+                SHA256.HashData(
+                    Encoding.UTF8.GetBytes(verificationToken)));
+
             var user = new UserAccount
             {
                 FullName = request.FullName.Trim(),
                 Email = email,
-                Role = "Staff"
+                Role = "Staff",
+                IsEmailVerified = false,
+                EmailVerificationTokenHash = verificationTokenHash,
+                EmailVerificationTokenExpiresAt = DateTime.UtcNow.AddHours(24)
             };
 
             var passwordHasher = new PasswordHasher<UserAccount>();
+
             user.PasswordHash = passwordHasher.HashPassword(
-                user, request.Password);
+                user,
+                request.Password);
 
             _context.UserAccounts.Add(user);
             await _context.SaveChangesAsync();
@@ -92,10 +109,26 @@ public class StaffController : ControllerBase
             await _context.SaveChangesAsync();
 
             await transaction.CommitAsync();
+            var verificationLink =
+    $"http://localhost:3000/verify-email?token={verificationToken}&email={Uri.EscapeDataString(user.Email)}";
+
+            try
+            {
+                await _emailService.SendVerificationEmailAsync(
+                    user.Email,
+                    verificationLink);
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Personel hesabı oluşturuldu ancak doğrulama e-postası gönderilemedi."
+                });
+            }
 
             return Ok(new
             {
-                message = "Personel başarıyla oluşturuldu.",
+                message = "Personel başarıyla oluşturuldu, E-postanızı kontrol ediniz.",
                 staff.Id,
                 staff.FullName,
                 staff.Email,

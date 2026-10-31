@@ -54,6 +54,9 @@ export default async function DoctorsPage() {
     error = true;
   }
 
+
+  console.log(doctors);
+
   return (
     <>
       <main className="min-h-screen bg-gray-50">
@@ -102,12 +105,19 @@ export default async function DoctorsPage() {
                   className="group rounded-2xl border border-gray-200 bg-white p-6 transition duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-900/5"
                 >
                   <div className="flex items-start justify-between">
-                    <div
+                    {/* <div
                       className={`flex h-20 w-20 items-center justify-center rounded-2xl text-2xl font-bold ${
                         colors[(doctor.id - 1) % colors.length]
                       }`}
                     >
                       {getInitials(doctor.fullName)}
+                    </div> */}
+                    <div className="flex size-[100px] items-center border justify-center rounded-2xl bg-blue-100 text-2xl text-blue-700">
+                      <img
+                        src={doctor?.photoUrl || "/images/user-icon.avif"}
+                        alt="Profil fotoğrafı"
+                        className="h-full w-full border rounded-2xl object-cover"
+                      />
                     </div>
 
                     <span className="rounded-lg bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700">

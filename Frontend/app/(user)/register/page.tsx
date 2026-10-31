@@ -3,10 +3,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
-  const router = useRouter();
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -92,12 +90,8 @@ export default function RegisterPage() {
       }
 
       setSuccess(
-        "Hesabınız başarıyla oluşturuldu. Giriş sayfasına yönlendiriliyorsunuz."
+        "Hesabınız oluşturuldu! E-posta adresinizi doğrulamak için gelen kutunuzu kontrol edin."
       );
-
-      setTimeout(() => {
-        router.push("/login");
-      }, 1200);
     } catch (err) {
       if (err instanceof TypeError) {
         setError(

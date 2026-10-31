@@ -85,6 +85,7 @@ export default function PatientPage() {
     const [photoMessage, setPhotoMessage] = useState("");
     const [photoError, setPhotoError] = useState("");
 
+
     async function loadPatientProfile() {
         try {
             const response = await fetch("/api/patients/my-profile", {
@@ -120,6 +121,7 @@ export default function PatientPage() {
         setProfileError("");
 
         try {
+
             const response = await fetch("/api/patients/my-profile", {
                 method: "PUT",
                 headers: {
@@ -314,13 +316,21 @@ export default function PatientPage() {
         }
     }
 
+
+
     function handlePhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
         const file = event.target.files?.[0];
 
         if (!file) return;
 
-        if (!file.type.startsWith("image/")) {
-            setPhotoError("Lütfen geçerli bir görsel dosyası seçin.");
+        const allowedTypes = [
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+        ];
+
+        if (!allowedTypes.includes(file.type)) {
+            setPhotoError("Yalnızca JPG, PNG veya WebP yükleyebilirsiniz.");
             return;
         }
 
@@ -335,8 +345,11 @@ export default function PatientPage() {
         setPhotoError("");
     }
 
+
+
+
     async function savePatientPhoto() {
-        if (!selectedPhoto) {
+        if (!selectedPhoto || !patient) {
             setPhotoError("Lütfen önce bir fotoğraf seçin.");
             return;
         }
@@ -346,27 +359,75 @@ export default function PatientPage() {
         setPhotoError("");
 
         try {
+            // 1. Fotoğrafı Cloudinary'ye yükle
             const formData = new FormData();
-            formData.append("photo", selectedPhoto);
+            formData.append("file", selectedPhoto);
 
-            const response = await fetch("/api/patients/my-profile/photo", {
-                method: "PUT",
+            const uploadResponse = await fetch("/api/patients/upload", {
+                method: "POST",
                 body: formData,
             });
 
-            const data = await response.json().catch(() => null);
+            const uploadData = await uploadResponse.json();
 
-            if (!response.ok) {
+            if (!uploadResponse.ok || !uploadData?.url) {
                 throw new Error(
-                    data?.message || "Profil fotoğrafı güncellenemedi."
+                    uploadData?.message || "Fotoğraf yüklenemedi."
                 );
             }
 
+            console.log("Cloudinary URL:", uploadData.url);
+
+            // 2. Profil bilgilerini hazırla
+            const profileData = {
+                fullName: patient.fullName,
+                age: patient.age,
+                gender: patient.gender,
+                phone: patient.phone,
+                photoUrl: uploadData.url,
+            };
+
+            console.log("Backend'e gönderilen veri:", profileData);
+
+            // 3. Backend'e gönder
+            const updateResponse = await fetch("/api/patients/my-profile", {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(profileData),
+            });
+
+            const updateData = await updateResponse.json();
+
+            console.log("Backend cevabı:", updateData);
+
+            if (!updateResponse.ok) {
+                throw new Error(
+                    updateData?.message ||
+                    updateData?.title ||
+                    "Profil kaydedilemedi."
+                );
+            }
+
+            // 4. Hasta bilgilerini güncelle
+            setPatient({
+                ...patient,
+                photoUrl: uploadData.url,
+            });
+
             setPhotoMessage("Profil fotoğrafınız başarıyla güncellendi.");
+
             setSelectedPhoto(null);
+
+            if (photoPreview) {
+                URL.revokeObjectURL(photoPreview);
+            }
+
             setPhotoPreview(null);
 
             await loadPatientProfile();
+
         } catch (err) {
             setPhotoError(
                 err instanceof Error
@@ -378,11 +439,13 @@ export default function PatientPage() {
         }
     }
 
+
     const tabs: [Tab, string][] = [
         ["appointments", "Randevularım"],
         ["doctors", "Doktorlar"],
         ["profile", "Bilgilerim"],]
     console.log(patient);
+    const api = process.env.NEXT_PUBLIC_API_BASE_URL
 
 
     return (
@@ -392,7 +455,11 @@ export default function PatientPage() {
                     <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-4">
                             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-100 text-2xl text-blue-700">
-                                ♙
+                                <img
+                                    src={patient?.photoUrl || "/images/user-icon.avif"}
+                                    alt="Profil fotoğrafı"
+                                    className="h-14 w-14 rounded-2xl object-cover"
+                                />
                             </div>
 
                             <div>
@@ -675,15 +742,9 @@ export default function PatientPage() {
                             <div className="mt-6 flex flex-col gap-5 sm:flex-row sm:items-center">
                                 <div className="relative h-24 w-24 shrink-0">
                                     <img
-                                        src={
-                                            photoPreview ||
-                                            (patient?.photoUrl
-                                                ? `http://localhost:5041${patient.photoUrl}`
-                                                : "/images/user-icon.avif") ||
-                                            "/images/user-icon.avif"
-                                        }
+                                        src={photoPreview || patient?.photoUrl || "/images/user-icon.avif"}
                                         alt="Profil fotoğrafı"
-                                        className="h-24 w-24 rounded-full border border-gray-200 object-cover"
+                                        className="h-24 w-24 rounded-full object-cover"
                                     />
 
                                     <label

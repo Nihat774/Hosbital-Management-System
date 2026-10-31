@@ -16,6 +16,8 @@ type Staff = {
   Gender?: string;
   jobtitle?: string | null;
   Jobtitle?: string | null;
+  isEmailVerified:boolean | null;
+  IsEmailVerified:boolean | null;
 };
 
 type StaffForm = {
@@ -148,9 +150,9 @@ export default function StaffSection() {
 
       setSuccess(
         data?.message ||
-          (editingStaff
-            ? "Personel bilgileri güncellendi."
-            : "Personel başarıyla eklendi.")
+        (editingStaff
+          ? "Personel bilgileri güncellendi."
+          : "Personel başarıyla eklendi.")
       );
 
       setForm(initialForm);
@@ -372,6 +374,7 @@ export default function StaffSection() {
                 <th className="px-4 py-3">Telefon</th>
                 <th className="px-4 py-3">Cinsiyet</th>
                 <th className="px-4 py-3">Görev</th>
+                <th className="px-4 py-3">E-posta status</th>
                 <th className="px-4 py-3">İşlemler</th>
               </tr>
             </thead>
@@ -400,6 +403,19 @@ export default function StaffSection() {
                     <td className="px-4 py-4">
                       {staff.jobtitle ?? staff.Jobtitle ?? "-"}
                     </td>
+
+                    <td className="px-4 py-4">
+                      {(staff.isEmailVerified ?? staff.IsEmailVerified) ? (
+                        <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
+                          Doğrulandı
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
+                          Doğrulanmadı
+                        </span>
+                      )}
+                    </td>
+
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-2">
                         <button
